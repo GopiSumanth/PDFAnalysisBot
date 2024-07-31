@@ -12,9 +12,10 @@ The PDF Bot is an AI-based tool designed to answer questions based on a provided
 
 
 2. Create a virtual environment and install dependencies:
-    python -m venv venv
+
+    ```python -m venv venv
     source venv/bin/activate 
-    pip install -r requirements.txt
+    pip install -r requirements.txt```
 
 3. Place the handbook PDF in the `data/` directory.
 
