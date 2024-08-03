@@ -1,10 +1,9 @@
-import os
-from llama_index.core import SimpleDirectoryReader
+from llama_index.core import SimpleDirectoryReader, SummaryIndex
+from llama_index.core.agent import AgentRunner, FunctionCallingAgentWorker
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.llms.openai import OpenAI
-from llama_index.core import SummaryIndex
 from llama_index.core.tools import QueryEngineTool
-from llama_index.core.agent import FunctionCallingAgentWorker, AgentRunner
+from llama_index.llms.openai import OpenAI
+
 
 def get_agent(file_path: str, llm=None):
     """
@@ -21,9 +20,11 @@ def get_agent(file_path: str, llm=None):
     1. Your answers should be a word-to-word match if the question is a word-to-word match; otherwise, it could be a summary.
     2. If the answer is low confidence or context is not available in the handbook, YOU MUST reply `Data Not Available`.
     """
-    
+
     # Initialize the language model
-    llm = llm or OpenAI(model="gpt-4o-mini", temperature=0, system_prompt=system_message)
+    llm = llm or OpenAI(
+        model="gpt-4o-mini", temperature=0, system_prompt=system_message
+    )
 
     # Load documents
     documents = SimpleDirectoryReader(input_files=[file_path]).load_data()
