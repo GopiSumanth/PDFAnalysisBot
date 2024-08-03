@@ -1,55 +1,56 @@
-from llama_index.core import SimpleDirectoryReader, SummaryIndex
-from llama_index.core.agent import AgentRunner, FunctionCallingAgentWorker
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core.tools import QueryEngineTool
-from llama_index.llms.openai import OpenAI
+import os
+import PyPDF2
+from openai import OpenAI
 
+class PDFReader:
+    def __init__(self, file_path):
+        self.file_path = file_path
 
-def get_agent(file_path: str, llm=None):
-    """
-    Initializes the AI agent with the specified LLM and loads the document.
+    def read(self):
+        with open(self.file_path, "rb") as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page_num in range(len(reader.pages)):
+                text += reader.pages[page_num].extract_text()
+        return text
 
-    Args:
-        file_path (str): Path to the handbook PDF.
-        llm: Language model instance (default: OpenAI).
+class Agent:
+    def __init__(self, document_text, api_key, model="gpt-4o-mini"):
+        self.document_text = document_text
+        self.api_key = api_key
+        self.model = model
 
-    Returns:
-        AgentRunner: Configured agent instance.
-    """
-    system_message = """You are an Assistant. YOU MUST follow the instructions below:
-    1. Your answers should be a word-to-word match if the question is a word-to-word match; otherwise, it could be a summary.
-    2. If the answer is low confidence or context is not available in the handbook, YOU MUST reply `Data Not Available`.
-    """
+    def query(self, question):
+        client = OpenAI(
+            # This is the default and can be omitted
+            api_key=self.api_key,
+        )
+        system_message = """You are an Assistant. YOU MUST follow the instructions below:
+            1. Your answers should be a word-to-word match if the question is a word-to-word match; otherwise, it could be a single text paragraph.
+            2. If the answer is low confidence or context is not available in the system content, YOU MUST reply `Data Not Available`.
+            """
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.document_text},
+                {"role": "assistant", "content": system_message},
+                {"role": "user", "content": question}
+            ],
+            temperature=0,
+            seed=1234,
+        )
+        return response.choices[0].message.content.strip()
 
-    # Initialize the language model
-    llm = llm or OpenAI(
-        model="gpt-4o-mini", temperature=0, system_prompt=system_message
-    )
+def get_agent(file_path: str, model="gpt-4o-mini"):
+    # Fetch the OpenAI API key from the environment variables
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        raise ValueError("API key not found. Please set the OPENAI_API_KEY environment variable.")
 
-    # Load documents
-    documents = SimpleDirectoryReader(input_files=[file_path]).load_data()
+    # Read the PDF document
+    pdf_reader = PDFReader(file_path)
+    document_text = pdf_reader.read()
 
-    # Split documents into nodes
-    splitter = SentenceSplitter(chunk_size=1024)
-    nodes = splitter.get_nodes_from_documents(documents)
-
-    # Create a summary index
-    summary_index = SummaryIndex(nodes)
-
-    # Initialize the query engine
-    summary_query_engine = summary_index.as_query_engine(
-        response_mode="tree_summarize", use_async=True, llm=llm
-    )
-
-    # Create a query engine tool
-    summary_tool = QueryEngineTool.from_defaults(
-        query_engine=summary_query_engine,
-        description="Useful for summarization answers related to handbook",
-    )
-
-    # Initialize the agent
-    agent_worker = FunctionCallingAgentWorker.from_tools(
-        [summary_tool], llm=llm, verbose=False, system_prompt=system_message
-    )
-    agent = AgentRunner(agent_worker)
+    # Initialize the agent with the document text and OpenAI API key
+    agent = Agent(document_text, api_key, model)
     return agent

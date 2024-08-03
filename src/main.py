@@ -22,7 +22,7 @@ def handler():
     # Process the questions
     response = {}
     for question in inputs:
-        response[question] = agent.query(question).response
+        response[question] = agent.query(question)
         print(f"{question} : {response[question]}\n\n")
 
     # Save the responses to a JSON file
